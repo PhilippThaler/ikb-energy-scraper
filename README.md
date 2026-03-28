@@ -16,7 +16,23 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
    ```env
    IKB_USERNAME=myemail@example.com
    IKB_PASSWORD=mypassword123
-4. Start the daemon using Docker Compose. It will automatically download the resulting CSV files into a `data/` folder on your host machine every day at 01:00 AM:
+   ```
+4. Create a `docker-compose.yml` file (or use the one provided in this repo):
+   ```yaml
+   services:
+     scraper:
+       build: .
+       image: ikb-scraper
+       container_name: ikb-scraper
+       restart: unless-stopped
+       env_file:
+         - .env
+       volumes:
+         - ./data:/data
+       # Run in daemon mode, scraping every day at 01:00 AM
+       command: ["--schedule", "01:00", "--log-level", "INFO"]
+   ```
+5. Start the daemon using Docker Compose. It will automatically download the resulting CSV files into a `data/` folder on your host machine every day at 01:00 AM:
    ```bash
    mkdir -p data
    sudo chown -R $(id -u):$(id -g) data/ # Ensure correct permissions
