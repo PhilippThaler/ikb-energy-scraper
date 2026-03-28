@@ -1,6 +1,7 @@
 import argparse
 import logging
 import time
+import schedule
 import os
 import sys
 from datetime import datetime, timedelta
@@ -143,12 +144,11 @@ def run_scraper(date_from: str, date_to: str, filename: str, resolution: str, fo
                 time.sleep(10)
 
 if __name__ == "__main__":
-    yesterday = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y")
 
     parser = argparse.ArgumentParser(description="Scrape energy data from direkt.ikb.at")
-    parser.add_argument("--from", dest="date_from", default=yesterday,
+    parser.add_argument("--from", dest="date_from", default="yesterday",
                         help="Start date in DD.MM.YYYY format (default: yesterday)")
-    parser.add_argument("--to", dest="date_to", default=yesterday,
+    parser.add_argument("--to", dest="date_to", default="yesterday",
                         help="End date in DD.MM.YYYY format (default: yesterday)")
     parser.add_argument("--output", dest="filename", default="",
                         help="Filename for the downloaded CSV (default: Lastprofil_<from>_<to>.csv)")
@@ -161,6 +161,8 @@ if __name__ == "__main__":
     parser.add_argument("--log-level", dest="log_level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="Set the logging level (default: INFO)")
+    parser.add_argument("--schedule", dest="schedule_time", default="",
+                        help="Run in daemon mode, scraping every day at this time (e.g. '01:00')")
     parser.add_argument("--retries", dest="max_retries", type=int, default=3,
                         help="Number of retries on failure (default: 3)")
     args = parser.parse_args()
@@ -177,36 +179,57 @@ if __name__ == "__main__":
         logger.handlers.clear()
     logger.addHandler(handler)
 
-    # Validate date format
-    try:
-        dt_from = datetime.strptime(args.date_from, "%d.%m.%Y")
-        dt_to = datetime.strptime(args.date_to, "%d.%m.%Y")
-    except ValueError as e:
-        logging.error(f"Error parse date: {e}")
-        sys.exit(1)
+    def job():
+        date_from = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y") if args.date_from == "yesterday" else args.date_from
+        date_to = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y") if args.date_to == "yesterday" else args.date_to
+        filename = args.filename
 
-    # Validate resolution date span compatibility
-    if args.resolution in ["Tag", "Woche", "Monat"] and dt_from == dt_to:
-        logging.error(f"Error: Resolution '{args.resolution}' is not allowed when --from and --to are the same date.")
-        sys.exit(1)
+        # Validate date format
+        try:
+            dt_from = datetime.strptime(date_from, "%d.%m.%Y")
+            dt_to = datetime.strptime(date_to, "%d.%m.%Y")
+        except ValueError as e:
+            logging.error(f"Error parse date: {e}")
+            if args.schedule_time: return
+            else: sys.exit(1)
 
-    if args.resolution in ["Woche", "Monat"]:
-        # Check if dates fall within the same calendar week
-        if dt_from.isocalendar()[:2] == dt_to.isocalendar()[:2]:
-            logging.error(f"Error: Resolution '{args.resolution}' requires spanning multiple weeks.")
-            sys.exit(1)
+        # Validate resolution date span compatibility
+        if args.resolution in ["Tag", "Woche", "Monat"] and dt_from == dt_to:
+            logging.error(f"Error: Resolution '{args.resolution}' is not allowed when --from and --to are the same date.")
+            if args.schedule_time: return
+            else: sys.exit(1)
 
-    if args.resolution == "Monat":
-        if dt_from.year == dt_to.year and dt_from.month == dt_to.month:
-            logging.error("Error: Resolution 'Monat' requires spanning multiple months.")
-            sys.exit(1)
+        if args.resolution in ["Woche", "Monat"]:
+            # Check if dates fall within the same calendar week
+            if dt_from.isocalendar()[:2] == dt_to.isocalendar()[:2]:
+                logging.error(f"Error: Resolution '{args.resolution}' requires spanning multiple weeks.")
+                if args.schedule_time: return
+                else: sys.exit(1)
 
-    if not args.filename:
-        iso_from = dt_from.strftime("%Y-%m-%d")
-        iso_to = dt_to.strftime("%Y-%m-%d")
-        if iso_from == iso_to:
-            args.filename = f"ikb_energy_export_{iso_from}.csv"
-        else:
-            args.filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
+        if args.resolution == "Monat":
+            if dt_from.year == dt_to.year and dt_from.month == dt_to.month:
+                logging.error("Error: Resolution 'Monat' requires spanning multiple months.")
+                if args.schedule_time: return
+                else: sys.exit(1)
 
-    run_scraper(args.date_from, args.date_to, args.filename, args.resolution, args.format_choice, args.max_retries)
+        if not filename:
+            iso_from = dt_from.strftime("%Y-%m-%d")
+            iso_to = dt_to.strftime("%Y-%m-%d")
+            if iso_from == iso_to:
+                filename = f"ikb_energy_export_{iso_from}.csv"
+            else:
+                filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
+
+        try:
+            run_scraper(date_from, date_to, filename, args.resolution, args.format_choice, args.max_retries)
+        except Exception as e:
+            logging.error(f"Scraper job failed: {e}")
+
+    if args.schedule_time:
+        logging.info(f"Starting daemon mode. Scheduled to run daily at {args.schedule_time}")
+        schedule.every().day.at(args.schedule_time).do(job)
+        while True:
+            schedule.run_pending()
+            time.sleep(60)
+    else:
+        job()

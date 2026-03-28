@@ -16,13 +16,13 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
    ```env
    IKB_USERNAME=myemail@example.com
    IKB_PASSWORD=mypassword123
-   ```
-4. Run the scraper. It will save the resulting CSV file into a `data/` folder on your host machine:
+4. Start the daemon using Docker Compose. It will automatically download the resulting CSV files into a `data/` folder on your host machine every day at 01:00 AM:
    ```bash
    mkdir -p data
    sudo chown -R $(id -u):$(id -g) data/ # Ensure correct permissions
-   docker run --env-file .env -v ./data:/data ikb-scraper
+   docker-compose up -d
    ```
+   *To view logs: `docker-compose logs -f`*
 
 ### Option 2: Using Python directly
 
@@ -67,9 +67,12 @@ You can customize the date range, the data resolution, and the output filename u
 
 # Export format
 ./venv/bin/python scraper.py --format csv
+
+# Daemon mode
+./venv/bin/python scraper.py --schedule 01:00
 ```
 
-*(If using Docker, simply append these arguments to the `docker run` command).*
+*(If using Docker without compose, simply append these arguments to the `docker run` command).*
 
 ### Resolutions
 Use `--resolution` to choose your data granularity. Available options: `15min` (default), `Stunde`, `Tag`, `Woche`, `Monat`.
