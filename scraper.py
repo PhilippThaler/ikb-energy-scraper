@@ -14,7 +14,7 @@ if not USERNAME or not PASSWORD:
     print("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
     sys.exit(1)
 
-def run_scraper(date_from: str, date_to: str, filename: str):
+def run_scraper(date_from: str, date_to: str, filename: str, resolution: str):
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -74,12 +74,12 @@ def run_scraper(date_from: str, date_to: str, filename: str):
         except Exception as e:
             print(f"Could not auto-fill dates: {e}")
 
-        print("Setting Auflösung (resolution) to 15min...")
+        print(f"Setting Auflösung (resolution) to {resolution}...")
         try:
-            # It's a radio button label with for='ResOpt1'
-            page.click("label[for='ResOpt1']", timeout=3000)
+            # Click the label containing the exact resolution text
+            page.click(f"label:has-text('{resolution}')", timeout=3000)
         except Exception as e:
-            print(f"Could not select 15min resolution: {e}")
+            print(f"Could not select {resolution} resolution: {e}")
 
         print("Clicking 'Aktualisieren' (Update)...")
         try:
@@ -93,7 +93,8 @@ def run_scraper(date_from: str, date_to: str, filename: str):
         try:
             with page.expect_download(timeout=60000) as download_info:
                 try:
-                    button = page.locator("button.export-button:has-text('E-Control')").first
+                    button_text = "E-Control" if resolution == "15min" else "CSV"
+                    button = page.locator(f"button.export-button:has-text('{button_text}')").first
                     print("Waiting for download button to appear in the export area (up to 30s)...")
                     button.click(timeout=30000)
                     print("Found download button automatically, clicking...")
@@ -126,22 +127,41 @@ if __name__ == "__main__":
                         help="End date in DD.MM.YYYY format (default: yesterday)")
     parser.add_argument("--output", dest="filename", default="",
                         help="Filename for the downloaded CSV (default: Lastprofil_<from>_<to>.csv)")
+    parser.add_argument("--resolution", dest="resolution", default="15min",
+                        choices=["15min", "Stunde", "Tag", "Woche", "Monat"],
+                        help="Data resolution (default: 15min)")
     args = parser.parse_args()
 
     # Validate date format
-    for label, val in [("--from", args.date_from), ("--to", args.date_to)]:
-        try:
-            datetime.strptime(val, "%d.%m.%Y")
-        except ValueError:
-            print(f"Error: {label} date '{val}' is not in DD.MM.YYYY format")
+    try:
+        dt_from = datetime.strptime(args.date_from, "%d.%m.%Y")
+        dt_to = datetime.strptime(args.date_to, "%d.%m.%Y")
+    except ValueError as e:
+        print(f"Error parse date: {e}")
+        sys.exit(1)
+
+    # Validate resolution date span compatibility
+    if args.resolution in ["Tag", "Woche", "Monat"] and dt_from == dt_to:
+        print(f"Error: Resolution '{args.resolution}' is not allowed when --from and --to are the same date.")
+        sys.exit(1)
+
+    if args.resolution in ["Woche", "Monat"]:
+        # Check if dates fall within the same calendar week
+        if dt_from.isocalendar()[:2] == dt_to.isocalendar()[:2]:
+            print(f"Error: Resolution '{args.resolution}' requires spanning multiple weeks.")
+            sys.exit(1)
+
+    if args.resolution == "Monat":
+        if dt_from.year == dt_to.year and dt_from.month == dt_to.month:
+            print("Error: Resolution 'Monat' requires spanning multiple months.")
             sys.exit(1)
 
     if not args.filename:
-        iso_from = datetime.strptime(args.date_from, "%d.%m.%Y").strftime("%Y-%m-%d")
-        iso_to = datetime.strptime(args.date_to, "%d.%m.%Y").strftime("%Y-%m-%d")
+        iso_from = dt_from.strftime("%Y-%m-%d")
+        iso_to = dt_to.strftime("%Y-%m-%d")
         if iso_from == iso_to:
             args.filename = f"ikb_energy_export_{iso_from}.csv"
         else:
             args.filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
 
-    run_scraper(args.date_from, args.date_to, args.filename)
+    run_scraper(args.date_from, args.date_to, args.filename, args.resolution)
