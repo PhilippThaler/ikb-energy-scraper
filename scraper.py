@@ -6,6 +6,14 @@ from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright, TimeoutError
 from dotenv import load_dotenv
 
+class LogfmtFormatter(logging.Formatter):
+    def format(self, record):
+        time = self.formatTime(record, self.datefmt)
+        level = record.levelname.lower()
+        # Escape quotes in the message to ensure valid logfmt
+        msg = record.getMessage().replace('"', '\\"')
+        return f'time="{time}" level={level} msg="{msg}"'
+
 load_dotenv()
 
 USERNAME = os.getenv("IKB_USERNAME", "").strip("\"'")
@@ -142,10 +150,17 @@ if __name__ == "__main__":
                         help="Set the logging level (default: INFO)")
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logger = logging.getLogger()
+    logger.setLevel(getattr(logging, args.log_level))
+    
+    handler = logging.StreamHandler()
+    formatter = LogfmtFormatter(datefmt='%Y-%m-%dT%H:%M:%SZ') # Basic ISO format
+    handler.setFormatter(formatter)
+    
+    # Remove any default handlers and add our logfmt handler
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logger.addHandler(handler)
 
     # Validate date format
     try:
