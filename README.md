@@ -47,7 +47,7 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
 
 By default, the script will download the energy consumption profile for **yesterday** at a **15-minute resolution** in the E-Control CSV format. 
 
-You can customize the date range and the output filename using CLI flags:
+You can customize the date range, the data resolution, and the output filename using CLI flags:
 
 ```bash
 # Default: yesterday's data
@@ -61,9 +61,19 @@ You can customize the date range and the output filename using CLI flags:
 
 # Custom output file
 ./venv/bin/python scraper.py --from 15.03.2026 --to 15.03.2026 --output custom_file.csv
+
+# Custom resolution
+./venv/bin/python scraper.py --resolution Monat --from 01.01.2026 --to 28.03.2026
 ```
 
 *(If using Docker, simply append these arguments to the `docker run` command).*
+
+### Resolutions
+Use `--resolution` to choose your data granularity. Available options: `15min` (default), `Stunde`, `Tag`, `Woche`, `Monat`.
+**Note:** The script enforces date compatibility based on your chosen resolution:
+- You cannot use `Tag`, `Woche`, or `Monat` if `--from` and `--to` are the same date.
+- You cannot use `Woche` or `Monat` if `--from` and `--to` fall within the **same calendar week**.
+- You cannot use `Monat` if `--from` and `--to` fall within the **same month**.
 
 ### Date Formats and Output Naming
 * Input dates for `--from` and `--to` **must** be in `DD.MM.YYYY` format.
