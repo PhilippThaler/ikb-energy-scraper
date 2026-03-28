@@ -10,6 +10,7 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
 1. Ensure you have Docker installed on your system.
 2. Build the Docker image:
    ```bash
+   # Optional: Build it yourself, or just use the pre-built GHCR image below
    docker build -t ikb-scraper .
    ```
 3. Set up your login credentials. Create a `.env` file in this directory:
@@ -20,10 +21,9 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
 4. Create a `docker-compose.yml` file (or use the one provided in this repo):
    ```yaml
    services:
-     scraper:
-       build: .
-       image: ikb-scraper
+     ikb-scraper:
        container_name: ikb-scraper
+       image: ghcr.io/philippthaler/ikb-energy-scraper:latest
        restart: unless-stopped
        env_file:
          - .env
