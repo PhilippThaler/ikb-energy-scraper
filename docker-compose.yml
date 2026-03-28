@@ -1,8 +1,8 @@
 services:
-  scraper:
+  ikb-energy-scraper:
     # Use the pre-built GHCR image instead of building locally
     image: ghcr.io/philippthaler/ikb-energy-scraper:latest
-    container_name: ikb-scraper
+    container_name: ikb-energy-scraper
     restart: unless-stopped
     env_file:
       - .env

@@ -3,6 +3,9 @@
 This script automates logging into the `direkt.ikb.at` portal and downloading your smart meter energy consumption data in CSV format. 
 It uses Playwright to drive a headless Chromium browser, utilizing stealth techniques (like custom User-Agents) to bypass Web Application Firewalls (WAF) that might otherwise block automated access.
 
+> [!CAUTION]
+> **Disclaimer:** This tool is intended for **personal use only**. Automated scraping of web portals may be against the terms of service of your utility provider. Use this responsibly and at your own risk.
+
 ## Setup
 
 ### Option 1: Using Docker (Recommended)
@@ -21,8 +24,8 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
 4. Create a `docker-compose.yml` file (or use the one provided in this repo):
    ```yaml
    services:
-     ikb-scraper:
-       container_name: ikb-scraper
+     ikb-energy-scraper:
+       container_name: ikb-energy-scraper
        image: ghcr.io/philippthaler/ikb-energy-scraper:latest
        restart: unless-stopped
        env_file:
