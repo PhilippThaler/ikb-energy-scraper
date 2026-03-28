@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 from datetime import datetime, timedelta
@@ -13,7 +14,7 @@ if not USERNAME or not PASSWORD:
     print("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
     sys.exit(1)
 
-def run_scraper():
+def run_scraper(date_from: str, date_to: str):
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -65,13 +66,11 @@ def run_scraper():
         except Exception as e:
             print(f"Could not select Zähler: {e}")
 
-        print("Setting timeframe (yesterday's date)...")
-        yesterday_str = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y")
-        print(f"Using date: {yesterday_str}")
+        print(f"Setting timeframe: {date_from} - {date_to}")
         try:
             # The date inputs are readonly, so we use JS (jQuery) to set them and trigger change
-            page.evaluate(f"$('#timeRangeFrom').val('{yesterday_str}').trigger('change');")
-            page.evaluate(f"$('#timeRangeTo').val('{yesterday_str}').trigger('change');")
+            page.evaluate(f"$('#timeRangeFrom').val('{date_from}').trigger('change');")
+            page.evaluate(f"$('#timeRangeTo').val('{date_to}').trigger('change');")
         except Exception as e:
             print(f"Could not auto-fill dates: {e}")
 
@@ -114,4 +113,21 @@ def run_scraper():
         browser.close()
 
 if __name__ == "__main__":
-    run_scraper()
+    yesterday = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y")
+
+    parser = argparse.ArgumentParser(description="Scrape energy data from direkt.ikb.at")
+    parser.add_argument("--from", dest="date_from", default=yesterday,
+                        help="Start date in DD.MM.YYYY format (default: yesterday)")
+    parser.add_argument("--to", dest="date_to", default=yesterday,
+                        help="End date in DD.MM.YYYY format (default: yesterday)")
+    args = parser.parse_args()
+
+    # Validate date format
+    for label, val in [("--from", args.date_from), ("--to", args.date_to)]:
+        try:
+            datetime.strptime(val, "%d.%m.%Y")
+        except ValueError:
+            print(f"Error: {label} date '{val}' is not in DD.MM.YYYY format")
+            sys.exit(1)
+
+    run_scraper(args.date_from, args.date_to)
