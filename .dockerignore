@@ -1,0 +1,9 @@
+venv/
+.env
+__pycache__/
+*.csv
+*.har
+debug_*.html
+.git/
+.gitignore
+README.md

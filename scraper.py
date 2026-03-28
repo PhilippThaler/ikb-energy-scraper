@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-USERNAME = os.getenv("IKB_USERNAME")
-PASSWORD = os.getenv("IKB_PASSWORD")
+USERNAME = os.getenv("IKB_USERNAME", "").strip("\"'")
+PASSWORD = os.getenv("IKB_PASSWORD", "").strip("\"'")
 
 if not USERNAME or not PASSWORD:
     print("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
