@@ -14,7 +14,7 @@ if not USERNAME or not PASSWORD:
     print("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
     sys.exit(1)
 
-def run_scraper(date_from: str, date_to: str, filename: str, resolution: str):
+def run_scraper(date_from: str, date_to: str, filename: str, resolution: str, format_choice: str):
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -93,7 +93,10 @@ def run_scraper(date_from: str, date_to: str, filename: str, resolution: str):
         try:
             with page.expect_download(timeout=60000) as download_info:
                 try:
-                    button_text = "E-Control" if resolution == "15min" else "CSV"
+                    button_text = "E-Control" if (format_choice == "e-control" and resolution == "15min") else "CSV"
+                    if format_choice == "e-control" and resolution != "15min":
+                        print("Warning: E-Control format is only available for 15min resolution. Falling back to standard CSV.")
+                    
                     button = page.locator(f"button.export-button:has-text('{button_text}')").first
                     print("Waiting for download button to appear in the export area (up to 30s)...")
                     button.click(timeout=30000)
@@ -130,6 +133,9 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", dest="resolution", default="15min",
                         choices=["15min", "Stunde", "Tag", "Woche", "Monat"],
                         help="Data resolution (default: 15min)")
+    parser.add_argument("--format", dest="format_choice", default="e-control",
+                        choices=["csv", "e-control"],
+                        help="Export format (default: e-control)")
     args = parser.parse_args()
 
     # Validate date format
@@ -164,4 +170,4 @@ if __name__ == "__main__":
         else:
             args.filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
 
-    run_scraper(args.date_from, args.date_to, args.filename, args.resolution)
+    run_scraper(args.date_from, args.date_to, args.filename, args.resolution, args.format_choice)

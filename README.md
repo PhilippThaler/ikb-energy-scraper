@@ -64,6 +64,9 @@ You can customize the date range, the data resolution, and the output filename u
 
 # Custom resolution
 ./venv/bin/python scraper.py --resolution Monat --from 01.01.2026 --to 28.03.2026
+
+# Export format
+./venv/bin/python scraper.py --format csv
 ```
 
 *(If using Docker, simply append these arguments to the `docker run` command).*
@@ -74,6 +77,10 @@ Use `--resolution` to choose your data granularity. Available options: `15min` (
 - You cannot use `Tag`, `Woche`, or `Monat` if `--from` and `--to` are the same date.
 - You cannot use `Woche` or `Monat` if `--from` and `--to` fall within the **same calendar week**.
 - You cannot use `Monat` if `--from` and `--to` fall within the **same month**.
+
+### Export Formats
+Use `--format` to choose your preferred export type. Available options: `e-control` (default), `csv`.
+**Note:** `e-control` is solely available for the `15min` resolution. If you attempt to use it with any other resolution, it will automatically fall back to downloading standard `csv`.
 
 ### Date Formats and Output Naming
 * Input dates for `--from` and `--to` **must** be in `DD.MM.YYYY` format.
