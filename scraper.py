@@ -14,7 +14,7 @@ if not USERNAME or not PASSWORD:
     print("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
     sys.exit(1)
 
-def run_scraper(date_from: str, date_to: str):
+def run_scraper(date_from: str, date_to: str, filename: str):
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -101,7 +101,11 @@ def run_scraper(date_from: str, date_to: str):
                     print(f"Auto-click failed: {e}")
                     
             download = download_info.value
-            target_filename = download.suggested_filename
+            target_filename = ""
+            if filename == "":
+                target_filename = download.suggested_filename
+            else:
+                target_filename = filename
             print(f"\nDownload started: {target_filename}")
             download.save_as(target_filename)
             print(f"Successfully saved to: {target_filename}")
@@ -120,6 +124,8 @@ if __name__ == "__main__":
                         help="Start date in DD.MM.YYYY format (default: yesterday)")
     parser.add_argument("--to", dest="date_to", default=yesterday,
                         help="End date in DD.MM.YYYY format (default: yesterday)")
+    parser.add_argument("--output", dest="filename", default="",
+                        help="Filename for the downloaded CSV (default: Lastprofil_<from>_<to>.csv)")
     args = parser.parse_args()
 
     # Validate date format
@@ -130,4 +136,12 @@ if __name__ == "__main__":
             print(f"Error: {label} date '{val}' is not in DD.MM.YYYY format")
             sys.exit(1)
 
-    run_scraper(args.date_from, args.date_to)
+    if not args.filename:
+        iso_from = datetime.strptime(args.date_from, "%d.%m.%Y").strftime("%Y-%m-%d")
+        iso_to = datetime.strptime(args.date_to, "%d.%m.%Y").strftime("%Y-%m-%d")
+        if iso_from == iso_to:
+            args.filename = f"ikb_energy_export_{iso_from}.csv"
+        else:
+            args.filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
+
+    run_scraper(args.date_from, args.date_to, args.filename)
