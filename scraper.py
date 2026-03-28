@@ -46,7 +46,12 @@ def run_scraper():
         try:
             page.wait_for_url("**/index.php?page=dashboard*", timeout=15000)
         except TimeoutError:
-            pass
+            # Check if we're still on the login page (= wrong credentials)
+            if "page=login" in page.url or page.locator("input[type='password']").is_visible():
+                print("Error: Login failed. Please check your IKB_USERNAME and IKB_PASSWORD in .env")
+                browser.close()
+                sys.exit(1)
+            print("Warning: Unexpected page after login, continuing anyway...")
 
         print("Navigating to Lastprofil/Tageswerte...")
         # Direct navigation instead of clicking
