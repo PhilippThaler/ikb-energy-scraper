@@ -18,7 +18,7 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
    # Optional: Build it yourself, or just use the pre-built GHCR image below
    git clone https://github.com/philippthaler/ikb-energy-scraper.git
    cd ikb-energy-scraper
-   docker build -t ikb-scraper .
+   docker build -t ikb-energy-scraper .
    ```
 3. Set up your login credentials. Create a `.env` file in this directory:
    ```env

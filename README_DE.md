@@ -17,7 +17,7 @@ Es verwendet Playwright, um einen headless Chromium-Browser zu steuern, und nutz
    ```bash
    git clone https://github.com/philippthaler/ikb-energy-scraper.git
    cd ikb-energy-scraper
-   docker build -t ikb-scraper .
+   docker build -t ikb-energy-scraper .
    ```
 3. Richten Sie Ihre Zugangsdaten ein. Erstellen Sie eine `.env`-Datei in diesem Verzeichnis:
    ```env
@@ -105,7 +105,7 @@ Sie können den Zeitraum, die Auflösung und den Dateinamen über CLI-Flags anpa
 ./venv/bin/python scraper.py --schedule 01:00
 ```
 
-### Directe Ausführung mit Docker
+### Direkte Ausführung mit Docker
 
 Wenn Sie Docker Compose nicht verwenden, können Sie Argumente direkt an das Image übergeben:
 
