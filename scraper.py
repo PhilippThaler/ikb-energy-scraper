@@ -18,11 +18,21 @@ class LogfmtFormatter(logging.Formatter):
 
 load_dotenv()
 
-USERNAME = os.getenv("IKB_USERNAME", "").strip("\"'")
-PASSWORD = os.getenv("IKB_PASSWORD", "").strip("\"'")
+def get_secret(secret_name):
+    file_env_var = f"{secret_name}_FILE"
+    secret_file = os.environ.get(file_env_var)
+    
+    if secret_file and os.path.exists(secret_file):
+        with open(secret_file, 'r') as f:
+            return f.read().strip().strip("\"'")
+
+    return os.environ.get(secret_name, "").strip().strip("\"'")
+
+USERNAME = get_secret("IKB_USERNAME")
+PASSWORD = get_secret("IKB_PASSWORD")
 
 if not USERNAME or not PASSWORD:
-    logging.error("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
+    logging.error("Error: IKB_USERNAME and IKB_PASSWORD environment variables (or their _FILE equivalents) must be set.")
     sys.exit(1)
 
 def run_scraper(date_from: str, date_to: str, filename: str, resolution: str, format_choice: str, max_retries: int = 3):

@@ -24,21 +24,24 @@ Es verwendet Playwright, um einen headless Chromium-Browser zu steuern, und nutz
    IKB_USERNAME=meine_email@beispiel.at
    IKB_PASSWORD=mein_passwort123
    ```
-4. Erstellen Sie eine `docker-compose.yml`-Datei (oder verwenden Sie die in diesem Repo vorhandene):
+4. Sehen Sie sich die `docker-compose.yml`-Datei an. Sie haben zwei Optionen für die Zugangsdaten:
+
+   **Option A: Klartext (Einfach)**
    ```yaml
-   services:
-     ikb-energy-scraper:
-       container_name: ikb-energy-scraper
-       image: ghcr.io/philippthaler/ikb-energy-scraper:latest
-       restart: unless-stopped
-       # env_file: .env
-       environment:
-         IKB_USERNAME: meine_email@beispiel.at
-         IKB_PASSWORD: mein_passwort123
-       volumes:
-         - ./data:/data
-       # Führt das Skript im Daemon-Modus aus, täglicher Abruf um 01:00 Uhr
-       command: ["--schedule", "01:00", "--log-level", "INFO"]
+   environment:
+     IKB_USERNAME: meine_email@beispiel.at
+     IKB_PASSWORD: mein_passwort123
+   ```
+
+   **Option B: Docker Secrets (Empfohlen)**
+   ```yaml
+   environment:
+     IKB_USERNAME_FILE: /run/secrets/ikb_username
+     IKB_PASSWORD_FILE: /run/secrets/ikb_password
+   secrets:
+     - ikb_username
+     - ikb_password
+   # Und definieren Sie die Dateien im top-level secrets Block
    ```
 5. Starten Sie den Daemon mit Docker Compose. Die CSV-Dateien werden automatisch jeden Tag um 01:00 Uhr im Ordner `data/` gespeichert:
    ```bash
@@ -112,6 +115,15 @@ docker run --rm --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy
 
 # Als Hintergrund-Daemon starten
 docker run -d --name ikb-scraper --restart unless-stopped --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --schedule 01:00
+
+# Ausführung mit Docker Secrets (Best Practice)
+docker run --rm \
+  -v ./data:/data \
+  -v ./secrets/username.txt:/run/secrets/ikb_username:ro \
+  -v ./secrets/password.txt:/run/secrets/ikb_password:ro \
+  -e IKB_USERNAME_FILE=/run/secrets/ikb_username \
+  -e IKB_PASSWORD_FILE=/run/secrets/ikb_password \
+  ghcr.io/philippthaler/ikb-energy-scraper:latest
 ```
 
 *(Bei Verwendung von Docker ohne Compose hängen Sie diese Argumente einfach an den `docker run`-Befehl an).*

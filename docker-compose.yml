@@ -3,11 +3,28 @@ services:
     image: ghcr.io/philippthaler/ikb-energy-scraper:latest
     container_name: ikb-energy-scraper
     restart: unless-stopped
-    # env_file: .env
-    environment:
-      IKB_USERNAME: meine_email@beispiel.at
-      IKB_PASSWORD: mein_passwort123
     volumes:
       - ./data:/data
     # Run in daemon mode, scraping every day at 01:00 AM
-    command: [ "--schedule", "01:00", "--log-level", "INFO" ]
+    command: ["--schedule", "01:00", "--log-level", "INFO"]
+
+    # --- OPTION A: Plaintext Environment Variables (Easy setup) ---
+    environment:
+      IKB_USERNAME: meine_email@beispiel.at
+      IKB_PASSWORD: mein_passwort123
+
+    # --- OPTION B: Docker Secrets (Recommended for security) ---
+    # Comment out Option A and uncomment the lines below to use secrets.
+    # environment:
+    #   IKB_USERNAME_FILE: /run/secrets/ikb_username
+    #   IKB_PASSWORD_FILE: /run/secrets/ikb_password
+    # secrets:
+    #   - ikb_username
+    #   - ikb_password
+
+# Uncomment this block if using Option B
+# secrets:
+#   ikb_username:
+#     file: ./secrets/ikb_username.txt
+#   ikb_password:
+#     file: ./secrets/ikb_password.txt

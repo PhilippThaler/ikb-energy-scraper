@@ -25,19 +25,24 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
    IKB_USERNAME=myemail@example.com
    IKB_PASSWORD=mypassword123
    ```
-4. Create a `docker-compose.yml` file (or use the one provided in this repo):
+4. Look at the `docker-compose.yml` file. You have two options for credentials:
+
+   **Option A: Plaintext (Easy)**
    ```yaml
-   services:
-     ikb-energy-scraper:
-       container_name: ikb-energy-scraper
-       image: ghcr.io/philippthaler/ikb-energy-scraper:latest
-       restart: unless-stopped
-       env_file:
-         - .env
-       volumes:
-         - ./data:/data
-       # Run in daemon mode, scraping every day at 01:00 AM
-       command: ["--schedule", "01:00", "--log-level", "INFO"]
+   environment:
+     IKB_USERNAME: myemail@example.com
+     IKB_PASSWORD: mypassword123
+   ```
+
+   **Option B: Docker Secrets (Recommended)**
+   ```yaml
+   environment:
+     IKB_USERNAME_FILE: /run/secrets/ikb_username
+     IKB_PASSWORD_FILE: /run/secrets/ikb_password
+   secrets:
+     - ikb_username
+     - ikb_password
+   # And define the files in the top-level secrets block
    ```
 5. Start the daemon using Docker Compose. It will automatically download the resulting CSV files into a `data/` folder on your host machine every day at 01:00 AM:
    ```bash
@@ -115,6 +120,15 @@ docker run --rm --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy
 
 # Run as a background daemon
 docker run -d --name ikb-scraper --restart unless-stopped --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --schedule 01:00
+
+# Run with Docker Secrets (best practice)
+docker run --rm \
+  -v ./data:/data \
+  -v ./secrets/username.txt:/run/secrets/ikb_username:ro \
+  -v ./secrets/password.txt:/run/secrets/ikb_password:ro \
+  -e IKB_USERNAME_FILE=/run/secrets/ikb_username \
+  -e IKB_PASSWORD_FILE=/run/secrets/ikb_password \
+  ghcr.io/philippthaler/ikb-energy-scraper:latest
 ```
 
 *(If using Docker without compose, simply append these arguments to the `docker run` command).*
