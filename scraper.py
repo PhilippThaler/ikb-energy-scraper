@@ -1,5 +1,6 @@
 import argparse
 import logging
+import time
 import os
 import sys
 from datetime import datetime, timedelta
@@ -23,111 +24,123 @@ if not USERNAME or not PASSWORD:
     logging.error("Error: IKB_USERNAME and IKB_PASSWORD environment variables must be set.")
     sys.exit(1)
 
-def run_scraper(date_from: str, date_to: str, filename: str, resolution: str, format_choice: str):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-            ]
-        )
-        context = browser.new_context(
-            accept_downloads=True,
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        )
-        # Remove the webdriver flag that WAFs detect
-        page = context.new_page()
-        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+def run_scraper(date_from: str, date_to: str, filename: str, resolution: str, format_choice: str, max_retries: int = 3):
+    for attempt in range(1, max_retries + 1):
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                    ]
+                )
+                context = browser.new_context(
+                    accept_downloads=True,
+                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                )
+                # Remove the webdriver flag that WAFs detect
+                page = context.new_page()
+                page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-        logging.info("Navigating to login page...")
-        page.goto("https://direkt.ikb.at/grid/index.php?page=login")
+                logging.info("Navigating to login page...")
+                page.goto("https://direkt.ikb.at/grid/index.php?page=login")
         
-        logging.info("Logging in...")
-        page.wait_for_load_state("networkidle")
-        # The login form is loaded via AJAX, so wait for the password field to appear
-        page.wait_for_selector("input[type='password']", timeout=15000)
-        # Fill username - it's the text input right before the password field
-        page.fill("input[type='password']", PASSWORD)
-        # Username field: find the visible text input in the login form
-        page.locator("input[type='text']").last.fill(USERNAME)
-        page.click("button[type='submit'], input[type='submit']")
+                logging.info("Logging in...")
+                page.wait_for_load_state("networkidle")
+                # The login form is loaded via AJAX, so wait for the password field to appear
+                page.wait_for_selector("input[type='password']", timeout=15000)
+                # Fill username - it's the text input right before the password field
+                page.fill("input[type='password']", PASSWORD)
+                # Username field: find the visible text input in the login form
+                page.locator("input[type='text']").last.fill(USERNAME)
+                page.click("button[type='submit'], input[type='submit']")
 
-        logging.info("Waiting for dashboard to load...")
-        try:
-            page.wait_for_url("**/index.php?page=dashboard*", timeout=15000)
-        except TimeoutError:
-            # Check if we're still on the login page (= wrong credentials)
-            if "page=login" in page.url or page.locator("input[type='password']").is_visible():
-                logging.error("Error: Login failed. Please check your IKB_USERNAME and IKB_PASSWORD in .env")
-                browser.close()
-                sys.exit(1)
-            logging.warning("Warning: Unexpected page after login, continuing anyway...")
-
-        logging.info("Navigating to Lastprofil/Tageswerte...")
-        # Direct navigation instead of clicking
-        page.goto("https://direkt.ikb.at/grid/index.php?page=loadprofile")
-        page.wait_for_load_state("networkidle")
-
-
-        logging.info("Selecting Zähler... (Forcing selection via jQuery)")
-        try:
-            page.evaluate("$('#metCodes').val($('#metCodes option').first().val()).trigger('change');")
-        except Exception as e:
-            logging.error(f"Could not select Zähler: {e}")
-
-        logging.info(f"Setting timeframe: {date_from} - {date_to}")
-        try:
-            # The date inputs are readonly, so we use JS (jQuery) to set them and trigger change
-            page.evaluate(f"$('#timeRangeFrom').val('{date_from}').trigger('change');")
-            page.evaluate(f"$('#timeRangeTo').val('{date_to}').trigger('change');")
-        except Exception as e:
-            logging.error(f"Could not auto-fill dates: {e}")
-
-        logging.info(f"Setting Auflösung (resolution) to {resolution}...")
-        try:
-            # Click the label containing the exact resolution text
-            page.click(f"label:has-text('{resolution}')", timeout=3000)
-        except Exception as e:
-            logging.error(f"Could not select {resolution} resolution: {e}")
-
-        logging.info("Clicking 'Aktualisieren' (Update)...")
-        try:
-            # Exact ID of the update button
-            page.click("#updateFlot", timeout=3000)
-        except Exception as e:
-            logging.error(f"Could not click Aktualisieren: {e}")
-
-        logging.info("Waiting for CSV export button...")
-        
-        try:
-            with page.expect_download(timeout=60000) as download_info:
+                logging.info("Waiting for dashboard to load...")
                 try:
-                    button_text = "E-Control" if (format_choice == "e-control" and resolution == "15min") else "CSV"
-                    if format_choice == "e-control" and resolution != "15min":
-                        logging.warning("Warning: E-Control format is only available for 15min resolution. Falling back to standard CSV.")
-                    
-                    button = page.locator(f"button.export-button:has-text('{button_text}')").first
-                    logging.info("Waiting for download button to appear in the export area (up to 30s)...")
-                    button.click(timeout=30000)
-                    logging.info("Found download button automatically, clicking...")
-                except Exception as e:
-                    logging.error(f"Auto-click failed: {e}")
-                    
-            download = download_info.value
-            target_filename = ""
-            if filename == "":
-                target_filename = download.suggested_filename
-            else:
-                target_filename = filename
-            logging.info(f"Download started: {target_filename}")
-            download.save_as(target_filename)
-            logging.info(f"Successfully saved to: {target_filename}")
-            
-        except TimeoutError:
-            logging.error("Timed out waiting for download. Intervene manually next time!")
+                    page.wait_for_url("**/index.php?page=dashboard*", timeout=15000)
+                except TimeoutError:
+                    # Check if we're still on the login page (= wrong credentials)
+                    if "page=login" in page.url or page.locator("input[type='password']").is_visible():
+                        logging.error("Error: Login failed. Please check your IKB_USERNAME and IKB_PASSWORD in .env")
+                        browser.close()
+                        sys.exit(1)
+                    logging.warning("Warning: Unexpected page after login, continuing anyway...")
 
-        page.wait_for_timeout(3000)
-        browser.close()
+                logging.info("Navigating to Lastprofil/Tageswerte...")
+                # Direct navigation instead of clicking
+                page.goto("https://direkt.ikb.at/grid/index.php?page=loadprofile")
+                page.wait_for_load_state("networkidle")
+
+
+                logging.info("Selecting Zähler... (Forcing selection via jQuery)")
+                try:
+                    page.evaluate("$('#metCodes').val($('#metCodes option').first().val()).trigger('change');")
+                except Exception as e:
+                    logging.error(f"Could not select Zähler: {e}")
+
+                logging.info(f"Setting timeframe: {date_from} - {date_to}")
+                try:
+                    # The date inputs are readonly, so we use JS (jQuery) to set them and trigger change
+                    page.evaluate(f"$('#timeRangeFrom').val('{date_from}').trigger('change');")
+                    page.evaluate(f"$('#timeRangeTo').val('{date_to}').trigger('change');")
+                except Exception as e:
+                    logging.error(f"Could not auto-fill dates: {e}")
+
+                logging.info(f"Setting Auflösung (resolution) to {resolution}...")
+                try:
+                    # Click the label containing the exact resolution text
+                    page.click(f"label:has-text('{resolution}')", timeout=3000)
+                except Exception as e:
+                    logging.error(f"Could not select {resolution} resolution: {e}")
+
+                logging.info("Clicking 'Aktualisieren' (Update)...")
+                try:
+                    # Exact ID of the update button
+                    page.click("#updateFlot", timeout=3000)
+                except Exception as e:
+                    logging.error(f"Could not click Aktualisieren: {e}")
+
+                logging.info("Waiting for CSV export button...")
+        
+                try:
+                    with page.expect_download(timeout=60000) as download_info:
+                        try:
+                            button_text = "E-Control" if (format_choice == "e-control" and resolution == "15min") else "CSV"
+                            if format_choice == "e-control" and resolution != "15min":
+                                logging.warning("Warning: E-Control format is only available for 15min resolution. Falling back to standard CSV.")
+                    
+                            button = page.locator(f"button.export-button:has-text('{button_text}')").first
+                            logging.info("Waiting for download button to appear in the export area (up to 30s)...")
+                            button.click(timeout=30000)
+                            logging.info("Found download button automatically, clicking...")
+                        except Exception as e:
+                            logging.error(f"Auto-click failed: {e}")
+                    
+                    download = download_info.value
+                    target_filename = ""
+                    if filename == "":
+                        target_filename = download.suggested_filename
+                    else:
+                        target_filename = filename
+                    logging.info(f"Download started: {target_filename}")
+                    download.save_as(target_filename)
+                    logging.info(f"Successfully saved to: {target_filename}")
+            
+                except TimeoutError:
+                    logging.error("Timed out waiting for download. Intervene manually next time!")
+                    raise Exception("Download timed out")
+
+                page.wait_for_timeout(3000)
+                browser.close()
+
+                return  # Success, exit the retry loop
+        except Exception as e:
+            if attempt == max_retries:
+                logging.error(f"Attempt {attempt} failed: {e}. Max retries reached.")
+                sys.exit(1)
+            else:
+                logging.warning(f"Attempt {attempt} failed: {e}. Retrying in 10s...")
+                time.sleep(10)
 
 if __name__ == "__main__":
     yesterday = (datetime.now() - timedelta(1)).strftime("%d.%m.%Y")
@@ -148,6 +161,8 @@ if __name__ == "__main__":
     parser.add_argument("--log-level", dest="log_level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="Set the logging level (default: INFO)")
+    parser.add_argument("--retries", dest="max_retries", type=int, default=3,
+                        help="Number of retries on failure (default: 3)")
     args = parser.parse_args()
 
     logger = logging.getLogger()
@@ -194,4 +209,4 @@ if __name__ == "__main__":
         else:
             args.filename = f"ikb_energy_export_{iso_from}_{iso_to}.csv"
 
-    run_scraper(args.date_from, args.date_to, args.filename, args.resolution, args.format_choice)
+    run_scraper(args.date_from, args.date_to, args.filename, args.resolution, args.format_choice, args.max_retries)
