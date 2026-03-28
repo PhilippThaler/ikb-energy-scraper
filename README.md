@@ -47,6 +47,16 @@ It uses Playwright to drive a headless Chromium browser, utilizing stealth techn
    ```
    *To view logs: `docker-compose logs -f`*
 
+6. **Alternative: Run once using `docker run`:**
+   ```bash
+   docker run --rm \
+     -v ./data:/data \
+     -e IKB_USERNAME="meine_email@beispiel.at" \
+     -e IKB_PASSWORD="mein_passwort123" \
+     ghcr.io/philippthaler/ikb-energy-scraper:latest \
+     --from 01.01.2026 --to 28.03.2026 --output test.csv
+   ```
+
 ### Option 2: Using Python directly
 
 1. Make sure you have Python installed.
@@ -93,6 +103,18 @@ You can customize the date range, the data resolution, and the output filename u
 
 # Daemon mode
 ./venv/bin/python scraper.py --schedule 01:00
+```
+
+### Running with Docker (Directly)
+
+If you aren't using Docker Compose, you can pass arguments directly to the image:
+
+```bash
+# Run for a specific date range once
+docker run --rm --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --from 01.01.2026 --to 28.03.2026
+
+# Run as a background daemon
+docker run -d --name ikb-scraper --restart unless-stopped --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --schedule 01:00
 ```
 
 *(If using Docker without compose, simply append these arguments to the `docker run` command).*

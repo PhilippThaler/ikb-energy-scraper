@@ -31,8 +31,10 @@ Es verwendet Playwright, um einen headless Chromium-Browser zu steuern, und nutz
        container_name: ikb-energy-scraper
        image: ghcr.io/philippthaler/ikb-energy-scraper:latest
        restart: unless-stopped
-       env_file:
-         - .env
+       # env_file: .env
+       environment:
+         IKB_USERNAME: meine_email@beispiel.at
+         IKB_PASSWORD: mein_passwort123
        volumes:
          - ./data:/data
        # Führt das Skript im Daemon-Modus aus, täglicher Abruf um 01:00 Uhr
@@ -45,6 +47,16 @@ Es verwendet Playwright, um einen headless Chromium-Browser zu steuern, und nutz
    docker-compose up -d
    ```
    *Logs anzeigen: `docker-compose logs -f`*
+
+6. **Alternative: Einmalige Ausführung mit `docker run`:**
+   ```bash
+   docker run --rm \
+     -v ./data:/data \
+     -e IKB_USERNAME="meine_email@beispiel.at" \
+     -e IKB_PASSWORD="mein_passwort123" \
+     ghcr.io/philippthaler/ikb-energy-scraper:latest \
+     --from 01.01.2026 --to 28.03.2026 --output test.csv
+   ```
 
 ### Option 2: Direkt mit Python
 
@@ -88,6 +100,18 @@ Sie können den Zeitraum, die Auflösung und den Dateinamen über CLI-Flags anpa
 
 # Daemon-Modus (geplante Ausführung)
 ./venv/bin/python scraper.py --schedule 01:00
+```
+
+### Directe Ausführung mit Docker
+
+Wenn Sie Docker Compose nicht verwenden, können Sie Argumente direkt an das Image übergeben:
+
+```bash
+# Einmalige Ausführung für einen bestimmten Zeitraum
+docker run --rm --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --from 01.01.2026 --to 28.03.2026
+
+# Als Hintergrund-Daemon starten
+docker run -d --name ikb-scraper --restart unless-stopped --env-file .env -v ./data:/data ghcr.io/philippthaler/ikb-energy-scraper:latest --schedule 01:00
 ```
 
 *(Bei Verwendung von Docker ohne Compose hängen Sie diese Argumente einfach an den `docker run`-Befehl an).*
